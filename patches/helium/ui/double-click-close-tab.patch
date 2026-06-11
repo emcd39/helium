@@ -1,0 +1,30 @@
+--- a/chrome/browser/ui/views/tabs/tab.cc
++++ b/chrome/browser/ui/views/tabs/tab.cc
+@@ -852,6 +852,14 @@ bool Tab::OnMousePressed(const ui::Mouse
+   // This and the release handler are interested in order to discumbate between
+   // activation clicks and drag initiation.
+   if (event.is_left_click()) {
++    // Double-click to close tab.
++    const base::TimeTicks now = base::TimeTicks::Now();
++    constexpr base::TimeDelta kDoubleClickInterval =
++        base::Milliseconds(500);
++    if (now - last_left_click_time_ <= kDoubleClickInterval) {
++      last_left_click_time_ = base::TimeTicks();
++      controller_->CloseTab(this, CloseTabSource::kFromMouse);
++    }
++    last_left_click_time_ = now;
+     shift_pressed_on_mouse_down_ = event.shift_down();
+   }
+   return true;
+--- a/chrome/browser/ui/views/tabs/tab.h
++++ b/chrome/browser/ui/views/tabs/tab.h
+@@ -296,6 +296,9 @@ class Tab : public gfx::AnimationDelegat
+   // up.
+   bool shift_pressed_on_mouse_down_ = false;
+ 
++  // Timestamp of the last left mouse button press for double-click detection.
++  base::TimeTicks last_left_click_time_;
++
+   std::unique_ptr<TabCloseButtonObserver> tab_close_button_observer_;
+ 
+   std::unique_ptr<tabs::TabDataObserver> tab_data_observer_;

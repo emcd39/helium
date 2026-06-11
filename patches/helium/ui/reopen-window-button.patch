@@ -1,0 +1,123 @@
+--- a/chrome/browser/ui/view_ids.h
++++ b/chrome/browser/ui/view_ids.h
+@@ -120,6 +120,10 @@ enum ViewID {
+ 
+   // Media Picker screen scroll view.
+   VIEW_ID_MEDIA_PICKER_SCREEN_SCROLL_VIEW,
++
++  // Helium toolbar buttons.
++  VIEW_ID_REOPEN_WINDOW_BUTTON,
+ };
+ 
+ #endif  // CHROME_BROWSER_UI_VIEW_IDS_H_
+--- a/chrome/browser/ui/views/toolbar/toolbar_view.cc
++++ b/chrome/browser/ui/views/toolbar/toolbar_view.cc
+@@ -189,6 +189,8 @@ constexpr int kToolbarActionsFlexOrder =
+ constexpr int kExtensionsFlexOrder = kToolbarFlexOrderOffset + 3;
+ 
+ constexpr int kDynamicNewTabButtonIconSize = 16;
++
++constexpr int kReopenWindowButtonIconSize = 16;
+ 
+ class DynamicNewTabToolbarButton : public ToolbarButton {
+  public:
+@@ -200,6 +202,16 @@ class DynamicNewTabToolbarButton : publ
+   int GetIconSize() const override { return kDynamicNewTabButtonIconSize; }
+ };
+ 
++class ReopenWindowToolbarButton : public ToolbarButton {
++ public:
++  explicit ReopenWindowToolbarButton(PressedCallback callback)
++      : ToolbarButton(std::move(callback)) {}
++  ~ReopenWindowToolbarButton() override = default;
++
++ protected:
++  int GetIconSize() const override { return kReopenWindowButtonIconSize; }
++};
++
+ // Gets the display mode for a given browser.
+ ToolbarView::DisplayMode GetDisplayMode(Browser* browser) {
+   // Checked in this order because even tabbed PWAs use the CUSTOM_TAB
+@@ -223,7 +235,8 @@ auto& GetViewCommandMap() {
+        {VIEW_ID_HOME_BUTTON, IDC_HOME},
+        {VIEW_ID_RELOAD_BUTTON, IDC_RELOAD},
+        {VIEW_ID_AVATAR_BUTTON, IDC_SHOW_AVATAR_MENU},
+-       {VIEW_ID_DYNAMIC_NEW_TAB_BUTTON, IDC_NEW_TAB},
++       {VIEW_ID_DYNAMIC_NEW_TAB_BUTTON, IDC_NEW_TAB},
++       {VIEW_ID_REOPEN_WINDOW_BUTTON, IDC_RESTORE_TAB},
+        {VIEW_ID_COLLAPSE_VERTICAL_TABS_BUTTON, IDC_TOGGLE_VERTICAL_TABS}});
+   return kViewCommandMap;
+ }
+@@ -556,6 +569,22 @@ void ToolbarView::Init() {
+   dynamic_new_tab_button_->SetProperty(views::kElementIdentifierKey,
+                                        kToolbarDynamicNewTabButtonElementId);
+ 
++  std::unique_ptr<ToolbarButton> reopen_window_button =
++      std::make_unique<ReopenWindowToolbarButton>(base::BindRepeating(
++          &ToolbarView::ReopenWindowButtonPressed, base::Unretained(this)));
++  const int reopen_window_button_size =
++      GetLayoutConstant(LayoutConstant::kToolbarButtonHeight);
++  reopen_window_button->SetPreferredSize(
++      gfx::Size(reopen_window_button_size, reopen_window_button_size));
++  reopen_window_button_ = AddChildView(std::move(reopen_window_button));
++  reopen_window_button_->SetID(VIEW_ID_REOPEN_WINDOW_BUTTON);
++  reopen_window_button_->SetTooltipText(
++      l10n_util::GetStringUTF16(IDS_TOOLTIP_REOPEN_WINDOW));
++  reopen_window_button_->GetViewAccessibility().SetName(
++      l10n_util::GetStringUTF16(IDS_TOOLTIP_REOPEN_WINDOW));
++  reopen_window_button_->SetVectorIcon(vector_icons::kHistoryIcon);
++  reopen_window_button_->SetHorizontalAlignment(gfx::ALIGN_CENTER);
++
+   if (extensions_container) {
+     extensions_container_ = AddChildView(std::move(extensions_container));
+     extensions_toolbar_coordinator_ =
+@@ -816,7 +845,7 @@ void ToolbarView::Init() {
+                                views::MaximumFlexSizeRule::kPreferred);
+ 
+   for (auto* button : std::array<views::Button*, 7>{
+-           vertical_tabs_collapse_button_, back_, forward_, reload_, home_,
++           vertical_tabs_collapse_button_, back_, forward_, reload_, reopen_window_button_, home_,
+            dynamic_new_tab_button_, avatar_}) {
+     if (button) {
+       button->set_tag(GetViewCommandMap().at(button->GetID()));
+@@ -1695,6 +1724,10 @@ void ToolbarView::VerticalTabsCollapseBu
+   controller->RequestCollapse(!controller->IsCollapsed());
+ }
+ 
++void ToolbarView::ReopenWindowButtonPressed(const ui::Event& event) {
++  browser_->tab_restore_service()->RestoreMostRecentEntry(nullptr);
++}
++
+ bool ToolbarView::AcceleratorPressed(const ui::Accelerator& accelerator) {
+   const views::View* focused_view = focus_manager()->GetFocusedView();
+   if (focused_view && (focused_view->GetID() == VIEW_ID_OMNIBOX)) {
+--- a/chrome/browser/ui/views/toolbar/toolbar_view.h
++++ b/chrome/browser/ui/views/toolbar/toolbar_view.h
+@@ -413,6 +413,7 @@ class ToolbarView : public views::Access
+   // Controls. Most of these can be null, e.g. in popup windows. Only
+   // |location_bar_| is guaranteed to exist. These pointers are owned by the
+   // view hierarchy.
++  raw_ptr<ToolbarButton> reopen_window_button_ = nullptr;
+   raw_ptr<ToolbarButton> vertical_tabs_collapse_button_ = nullptr;
+   raw_ptr<ToolbarButton> back_ = nullptr;
+   raw_ptr<ToolbarButton> forward_ = nullptr;
+@@ -445,6 +446,7 @@ class ToolbarView : public views::Access
+   void OnTouchUiChanged();
+ 
+   void NewTabButtonPressed(const ui::Event& event);
++  void ReopenWindowButtonPressed(const ui::Event& event);
+   void VerticalTabsCollapseButtonPressed(const ui::Event& event);
+ 
+   void InitGlicContainer();
+--- a/chrome/app/generated_resources.grd
++++ b/chrome/app/generated_resources.grd
+@@ -10961,6 +10961,9 @@ Keep your key file in a safe place. You
+       <message name="IDS_ACCNAME_FIND" desc="The accessible name for the find button.">
+         Find
+       </message>
++      <message name="IDS_TOOLTIP_REOPEN_WINDOW" desc="Tooltip for the reopen closed window button.">
++        Reopen closed window
++      </message>
+       <message name="IDS_ACCNAME_BOOKMARKS" desc="The accessible name for the Bookmarks toolbar.">
+         Bookmarks
+       </message>
