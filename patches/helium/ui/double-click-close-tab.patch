@@ -1,6 +1,6 @@
 --- a/chrome/browser/ui/views/tabs/tab.cc
 +++ b/chrome/browser/ui/views/tabs/tab.cc
-@@ -852,6 +852,14 @@ bool Tab::OnMousePressed(const ui::Mouse
+@@ -852,6 +852,15 @@ bool Tab::OnMousePressed(const ui::Mouse
    // This and the release handler are interested in order to discumbate between
    // activation clicks and drag initiation.
    if (event.is_left_click()) {
